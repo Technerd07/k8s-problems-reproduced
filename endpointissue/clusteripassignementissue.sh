@@ -1,4 +1,5 @@
 #!/bin/bash
+#run this script in the manual cluster
 #run this script as a root user . my environment = manually installed kubernetes cluster on windows machine
 #running over oracle virtual box vm's
 #This script must be run on the controlplane node which has kube-apiserver component is running

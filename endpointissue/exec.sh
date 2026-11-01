@@ -1,4 +1,5 @@
 #!/bin/bash
+#RUN this script in the manual cluster for more control
 #This script is used to reproduce the issue with exec into a pod that has an endpoint issue in Kubernetes.
 #Running this script from the alpine pod to connect to nginx pod via svc (cluster ip) and endpoint(calico-cni-ip) if this fails then the problem has been reproduced successfully.
 
