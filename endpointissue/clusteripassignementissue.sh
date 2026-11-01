@@ -45,7 +45,7 @@ check_podtopodcomm (){
 check_kubeapiserverUnitFile (){
     if [ "$(systemctl status kube-apiserver.service 2>/dev/null | grep -c "Active: active (running)")" -gt 0 ]; then
         echo $?;
-        #first stop the service and check the unit file wether it has --cluster-dns flag and ip assignment subnet or not inside
+        #first stop the service and check the unit file wether it has --service-cluster-ip-range         
         systemctl stop kube-apiserver.service          
         filecontainsclusterDns=$(cat /etc/systemd/system/kube-apiserver.service | grep -c "--cluster-DNS" "--cluster-domain")
 
@@ -57,8 +57,7 @@ check_kubeapiserverUnitFile (){
             if [ "${filecontainsclusterDns}" -gt 0 ]; then
                 echo "True : The kube-apiserver unit file contains the --cluster-dns flag and the ip assignment subnet deleting the lines [*]...."
                 #delete those lines from the unit file and start the service and check the logs for any errors
-                sed -i '/--clusterDNS=/d' /etc/systemd/system/kube-apiserver.service
-                sed -i '/--cluster-domain=/d' /etc/systemd/system/kube-apiserver.service
+                sed -i '/--service-cluster-ip-range=/d' /etc/systemd/system/kube-apiserver.service
                 return 0;
                 else 
                 echo "False"
@@ -78,5 +77,8 @@ check_endpointassignment (){
 }
 
 main (){
+    check_podtopodcomm
+    check_kubeapiserverUnitFile
+    check_endpointassignment
 }
 main "$@"
