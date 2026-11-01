@@ -240,4 +240,8 @@ ipset list
 calicoctl node status 2>/dev/null || true
 ```
 
-The scripts document a manually reproduced environment and contain experimental shell logic. Their source code has deliberately been left unchanged; review their output and shell behavior before applying any remediation to a cluster.
+The scripts document a manually reproduced environment and contain experimental shell logic. Review their output and behavior before applying any remediation to a cluster.
+
+## Expected working procedure
+
+When a pod requests a Kubernetes Service by name, its resolver configuration directs the DNS query to the cluster DNS Service, which routes it to a CoreDNS pod. CoreDNS resolves the Service name using Kubernetes service and endpoint information and returns the Service's ClusterIP to the requesting pod. The pod then connects to that ClusterIP, and the Kubernetes Service dataplane forwards the traffic to a selected backend pod and its container port. The response travels back through the service dataplane to the requesting pod. DNS resolution supplies the Service IP; it does not itself carry the application traffic to the backend.

@@ -23,6 +23,9 @@ check_routing (){
     #echo "Deleting the bad-gateway"
     #ip route del via "${bad_gateway}" dev enp0s8
 }
- main (){
+#nameserver 10.96.0.10 (cluster-IP configured by kube-apiserver unit file change)
+#search default.svc.cluster.local svc.cluster.local cluster.local ec2.internal (Delete this line)
+#options ndots:5 (no changes)
+main (){
     check_routing
 }
