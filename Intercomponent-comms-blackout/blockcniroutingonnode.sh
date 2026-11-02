@@ -20,13 +20,13 @@ destroy_rules (){
 if ! dpkg -l | grep -q iptables ; then
 	echo "ERROR: iptables not installed!"
 	else 
-		apt get update && apt install iptables -y &>/dev/null
+		apt-get update && apt-get install iptables -y &>/dev/null
 fi
 #save the rules even if the iptable rules are not present
 iptables-save >"${backupfile}"
 #now add the route destruction rule into iptables (warning! this rule makes the cni networking fail)
 #caution: sudo iptables -A FORWARD -o cni0 -j DROP
-iptables -A FORWARD -O cni0 -j DROP 
+iptables -A FORWARD -o cni0 -j DROP 
 }
 #function to revertback the default routes
 revert_back (){
@@ -41,7 +41,7 @@ revert_back (){
 			return 1
 	fi
 }
-#This function will not be called.. will only be set to call to revert the defaults back to nornmal
+#This function will not be called.. and will only be set to call to revert the defaults back to nornmal
 main (){
 	destroy_rules
 }
