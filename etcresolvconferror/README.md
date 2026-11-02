@@ -2,6 +2,26 @@
 
 This folder contains scripts used to reproduce DNS and routing problems in a manually installed Kubernetes cluster.
 
+## Kubernetes Service DNS and Traffic Flow
+
+For Service access by name, a pod sends its DNS query to the `kube-dns` Service, which forwards it to CoreDNS. CoreDNS uses Kubernetes Service and Endpoint data to return the Service ClusterIP. The application then connects to that ClusterIP, and the Service dataplane forwards traffic to a selected backend pod. Response traffic follows the reverse path. DNS supplies the Service IP; the Service dataplane carries the application traffic.
+
+```mermaid
+flowchart LR
+    App["Application in Alpine pod"] -->|"1. Request nginx-svc"| Resolv["Pod /etc/resolv.conf"]
+    Resolv -->|"2. DNS query"| DNSService["kube-dns Service"]
+    DNSService -->|"3. Forward DNS query"| CoreDNS["CoreDNS pod"]
+    CoreDNS <-->|"4. Service and Endpoint data"| API["Kubernetes API"]
+    CoreDNS -->|"5. Return nginx-svc → Service ClusterIP"| DNSService
+    DNSService -->|"6. DNS response"| Resolv
+    App -->|"7. Application request to Service ClusterIP"| Service["nginx-svc Service"]
+    Service --> Dataplane["Service dataplane: kube-proxy or CNI"]
+    Dataplane -->|"8. Forward to selected endpoint"| Backend["Nginx backend pod"]
+    Backend -->|"9. Response traffic"| Dataplane
+    Dataplane --> Service
+    Service -->|"10. Return response"| App
+```
+
 The reproduced issue occurs even though direct pod-to-pod communication works through the Calico CNI. A pod such as Alpine can reach Nginx directly by Pod IP:
 
 ```bash
@@ -242,6 +262,3 @@ calicoctl node status 2>/dev/null || true
 
 The scripts document a manually reproduced environment and contain experimental shell logic. Review their output and behavior before applying any remediation to a cluster.
 
-## Expected working procedure
-
-When a pod requests a Kubernetes Service by name, its resolver configuration directs the DNS query to the cluster DNS Service, which routes it to a CoreDNS pod. CoreDNS resolves the Service name using Kubernetes service and endpoint information and returns the Service's ClusterIP to the requesting pod. The pod then connects to that ClusterIP, and the Kubernetes Service dataplane forwards the traffic to a selected backend pod and its container port. The response travels back through the service dataplane to the requesting pod. DNS resolution supplies the Service IP; it does not itself carry the application traffic to the backend.
