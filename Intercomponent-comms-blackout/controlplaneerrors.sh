@@ -11,15 +11,7 @@ fi
 #First check wether etcdutl binary is installed in the controlplane(node)
 #In my case i have not installed but currently when this problem was encountered i went back to jumpbox machine/kubernetes-the-hard-way/Downloads/etcd-xxx.tar.gz/etcdutl and copied it to the controlplane node
 downloadRelatedArchives (){
-	host=jumpbox
-	if  ping -c 4 "${host}" &>/dev/null; then
-		echo "host online"
-		return 0
-		else 
-		echo "host offline"
-		return 1
-	fi
-	arch=$(dpkg --print-architecture)
+	declare arch=$(dpkg --print-architecture)
 	dir=etcd-v3.7.3-linux-"${arch}".tar.gz 
 	wget -cv --https-only --limit-rate=10M --timestamping --show-progress https://github.com/etcd-io/etcd/releases/download/v3.7.3/etcd-v3.7.3-linux-"${arch}".tar.gz
 	echo "exit code:" &?
