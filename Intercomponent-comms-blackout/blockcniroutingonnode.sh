@@ -1,4 +1,5 @@
 #!/bin/bash
+#Before executing any thing backing up the etcd snapshots into a file is a must step to move further which in case goes wrong complete cluster state might get into chaos
 #This script must be run on the node machines 
 #first check the crictl status of the list of pods that are running on the node machine
 #Then first save the iptable rules into a backup file
