@@ -13,29 +13,32 @@ This exercise demonstrates a staged Kubernetes outage by disrupting pod-to-pod n
 5. The final intended step blocks access to the Kubernetes API server (commonly TCP 6443), causing `kubectl` and other API clients to fail.
 
 ```mermaid
-    A([Healthy cluster]) --> B
+flowchart LR
+    A([Healthy cluster]) --> B[Save firewall rules on node]
+    B --> C[Drop forwarded traffic leaving cni0]
+    C --> D([Pod-to-pod communication fails])
+    D --> E[Take and verify etcd snapshot]
+    E --> F[Block etcd client traffic on TCP 2379]
+    F --> G[Block API server traffic on TCP 6443]
+    G --> H([Cluster API becomes unavailable])
 
-    subgraph NETWORK[STAGE 1 — POD NETWORK]
-        direction LR
-        B[Save firewall rules<br/>on the node] --> C[DROP forwarded traffic<br/>leaving cni0] --> D([POD-TO-POD<br/>COMMUNICATION FAILS])
+    subgraph NETWORK[Stage 1: Pod network]
+        B
+        C
+        D
     end
 
-    D --> E
-
-    subgraph CONTROL[STAGE 2 — CONTROL PLANE]
-        direction LR
-        E[Take and verify<br/>etcd snapshot] --> F[Block etcd client traffic<br/>TCP port 2379] --> G[Block API server traffic<br/>TCP port 6443] --> H([CLUSTER API<br/>BECOMES UNAVAILABLE])
+    subgraph CONTROL[Stage 2: Control plane]
+        E
+        F
+        G
+        H
     end
 
-    classDef start fill:#ecfdf5,stroke:#059669,color:#064e3b,stroke-width:3px,font-size:20px
-    classDef action fill:#eff6ff,stroke:#2563eb,color:#172554,stroke-width:2px,font-size:18px
-    classDef failure fill:#fff1f2,stroke:#e11d48,color:#881337,stroke-width:3px,font-size:19px
-    class A start
+    classDef action fill:#eaf2ff,stroke:#356ac3,stroke-width:2px
+    classDef impact fill:#fff0f0,stroke:#c43c3c,stroke-width:3px
     class B,C,E,F,G action
-    class D,H failure
-
-    style NETWORK fill:#f8fafc,stroke:#64748b,stroke-width:2px
-    style CONTROL fill:#f8fafc,stroke:#64748b,stroke-width:2px
+    class D,H impact
 ```
 
 ## Current script status
