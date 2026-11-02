@@ -29,15 +29,17 @@ fi
 #for testing im using nignx pod and alpine pod with curl installed to check the connectivity between the pods and the clusterip service
 #first check these pods are running
 podsrunning=$(kubectl get pods -A -n default | grep -c "alpine" "nginx")
+nginxPod=$(kubectl get pods -A -n default app=nginx -o jsonpath='{.items[0].metadata.name}')
+alpinePod=$(kubectl get pods -A -n default app=alpine -o jsonpath='{.items[0].metadata.name}')
 #first check the ipof the pods and store them into a variable
-ipvarnginx=$(kubectl exec -it pods/nginx -n default -- hostname -I | awk '{print $1}')
-ipvaralpine=$(kubectl exec -it pods/alpine -n default -- hostname -I | awk '{print $1}')
+ipvarnginx=$(kubectl exec -it pods/"${nginxPod}" -n default -- hostname -I | awk '{print $1}')
+ipvaralpine=$(kubectl exec -it pods/"${alpinePod}" -n default -- hostname -I | awk '{print $1}')
 #check the connectivity between the pods and the clusterip service
 
 check_podtopodcomm (){
     #first check the connectivity from alpine pod to nginx
     #pod to pod connectivity check if cni calico is working fine or not
-    returnStatus= $(kubectl exec -it pod/alpine -n default -- ping -c 4 "${ipvarnginx}" 2&1> /dev/null; echo $?)
+    returnStatus=kubectl exec -it pod/"${alpinePod}" -n default -- ping -c 4 "${ipvarnginx}" 2&1>/dev/null || true ; echo $?
     while returnStatus -eq 0; do
         echo "Connectivity between alpine pod and nginx pod is successful"
         return 0;
@@ -48,7 +50,7 @@ check_kubeapiserverUnitFile (){
         echo $?;
         #first stop the service and check the unit file wether it has --service-cluster-ip-range         
         systemctl stop kube-apiserver.service          
-        filecontainsclusterDns=$(cat /etc/systemd/system/kube-apiserver.service | grep -c "--cluster-DNS" "--cluster-domain")
+        filecontainsclusterDns=$(cat /etc/systemd/system/kube-apiserver.service | grep -c "--server-cluster-ip-range")
 
        #This makes the api server to assign coredns pods IP from the cluster dns subnet range
        #In the manual installation there is no in built core-dns pods that run automatically these pods must be installed manually from the reo coredns/deployment/kubernetes/deploy.sh file
