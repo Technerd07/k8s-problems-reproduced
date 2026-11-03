@@ -23,10 +23,10 @@ downloadRelatedArchives (){
 	local version="v3.7.3"
 	local filename="etcd-${version}"-linux-${arch}.tar.gz
 	local extract_dir
-	extract_dir="$(pwd)/etcd-${version}-linux-${arch}.tar.gz"
+	extract_dir="$(pwd)/etcd-${version}-linux-${arch}"
 	local downloadurl="https://github.com/etcd-io/etcd/releases/download/${version}/${filename}"
 	wget -cv --https-only --limit-rate=10M --timestamping --show-progress "${downloadurl}"
-	echo "exit code:" &?
+	echo "exit code: $?"
 	#now extract the tarball and mv the etcdutl to /usr/local/bin
 	tar -xvf "${filename}"
 	if [ -d "${extract_dir}" ]; then
@@ -56,9 +56,36 @@ make_etcdSnapshot (){
 	fi
 
 }
+#now block the traffic and incoming connections over kube-apiserver and etcd and iptable rules of the node
+#(warning!):  
+# 1. Drop incoming traffic to the API server secure port
+#sudo iptables -A INPUT -p tcp --dport 6443 -m comment --comment controlplane-errors-apiserver -j DROP
+# 2. Drop incoming traffic to the etcd client port
+#sudo iptables -A INPUT -p tcp --dport 2379 -m comment --comment controlplane-errors-etcd -j DROP
 
+#revertback: 
+#sudo iptables -D OUTPUT -p tcp --dport 6443 -m comment --comment controlplane-errors-apiserver -j DROP
+#sudo iptables -D OUTPUT -p tcp --dport 2379 -m comment --comment controlplane-errors-etcd -j DROP
+
+injecterrors (){
+	#check iptables are installed or not
+	if ! command -v iptables &>/dev/null; then
+		echo "Iptables installed "
+		else
+		 	echo $?
+			apt-get update && apt-get install iptables -y
+	fi
+	local backupfile="/tmp/iptables.bak"
+	#save the rules even if the rules are empty
+	iptables-save > "${backupfile}"
+	iptables -A INPUT -p tcp --dport 6443 -m comment --comment controlplane-errors-apiserver -j DROP
+	iptables -A INPUT -p tcp --dport 2379 -m comment --comment controlplane-errors-etcd -j DROP
+	#Now check the tls timedout error from apiserver
+	kubectl get pods -A -n default
+}
 main (){
 	downloadRelatedArchives
 	make_etcdSnapshot
+	injecterrors
 }
 main "$@"
