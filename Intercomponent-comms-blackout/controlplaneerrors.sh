@@ -12,25 +12,46 @@ fi
 #In my case i have not installed but currently when this problem was encountered i went back to jumpbox machine/kubernetes-the-hard-way/Downloads/etcd-xxx.tar.gz/etcdutl and copied it to the controlplane node
 downloadRelatedArchives (){
 	#first check etcdutl is installed in the system
-	if ! command -v etcdutl >/dev/null; then
+	if ! command -v etcdutl &>/dev/null; then
 		echo "Error: etcdutl is not installed on the system"
-		exit 1
 		else 
-			which "$(etcdutl)"
+		echo "etcdutl is already installed "
+		return 0
 	fi
-	declare -r  arch
+	local arch
 	arch=$(dpkg --print-architecture)
-	dir=$(pwd)/etcd-v3.7.3-linux-"${arch}".tar.gz 
-	wget -cv --https-only --limit-rate=10M --timestamping --show-progress https://github.com/etcd-io/etcd/releases/download/v3.7.3/etcd-v3.7.3-linux-"${arch}".tar.gz
+	local version="v3.7.3"
+	local filename="etcd-${version}"-linux-${arch}.tar.gz
+	local extract_dir
+	extract_dir="$(pwd)/etcd-${version}-linux-${arch}.tar.gz"
+	local downloadurl="https://github.com/etcd-io/etcd/releases/download/${version}/${filename}"
+	wget -cv --https-only --limit-rate=10M --timestamping --show-progress "${downloadurl}"
 	echo "exit code:" &?
 	#now extract the tarball and mv the etcdutl to /usr/local/bin
-	tar -xvf etcd-v3.7.3-linux-"${arch}".tar.gz
-	if [ -d "${dir}" ]; then
-		chmod +x "${dir}/etdutl" 
-		mv -v "${dir}/etcdutl" /usr/local/bin
+	tar -xvf "${filename}"
+	if [ -d "${extract_dir}" ]; then
+		chmod +x "${extract_dir}/etdutl" 
+		mv -v "${extract_dir}/etcdutl" /usr/local/bin
 		return 0;
 		else
-			echo "Dir not found"
+			echo "Extracted dir not found at ${extract_dir}"
+			return 1
+	fi
+}
+backupfile="/tmp/etcd-backup.db"
+make_etcdSnapshot (){
+	if ! command -v etcdutl &>/dev/null; then 
+		echo "Error: etcdutl binary not found in PATH"
+		return 1
+	fi
+	#Here ill be using the /tmp folder to temporarily store the backup.db file
+	etcdutil snapshot save "${backupfile}" 
+	#check the stautus of the execution by inspecting the content of the file
+	if [[ -f "${backupfile}" ]]; then
+		etcdutl snapshot status "${backupfile}" --write-out=table 
+		echo "exit status: "$?
+		else
+			echo "ERROR: file does not exist on the /tmp directory"
 			return 1
 	fi
 
@@ -38,5 +59,6 @@ downloadRelatedArchives (){
 
 main (){
 	downloadRelatedArchives
+	make_etcdSnapshot
 }
 main "$@"
