@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: alpine
+  name: alpine
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alpine
+  template:
+    metadata:
+      labels:
+        app: alpine
+    spec:
+      containers:
+      - image: alpine:latest
+        name: alpine
+        command: ["/bin/sh", "-c", "while true; do sleep 3600; done"]
+#Either way instead of using yaml manifests we can use direct commands 
+#kubectl create deployment {alpine or nignx} --image={nginx or alpine}:latest 
