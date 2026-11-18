@@ -7,6 +7,72 @@ Here is what I did, the hiccups I faced, and how I recovered.
 
 ---
 
+## Experiment and packet-path diagram
+
+The diagram combines the simplified packet paths with the sequence and
+observations recorded in this experiment. The bridge-netfilter path is a
+working model for this lab, not a guarantee that every CNI or kube-proxy mode
+handles packets identically. The conntrack/CNI links are investigation
+hypotheses from the observed failures, not proof by themselves.
+
+```mermaid
+flowchart TB
+    subgraph PACKETS["Simplified pod traffic on a worker"]
+        client["Alpine client pod<br/>eth0"] --> veth["Pod veth pair"]
+        veth --> bridge["Linux bridge<br/>cni0"]
+        bridge --> destination{"Destination?"}
+
+        destination -->|"Service ClusterIP"| bridge_hook{"br_netfilter loaded<br/>and bridge-nf-call-iptables enabled?"}
+        bridge_hook -->|"Yes: bridge traffic reaches netfilter"| service_rules["Netfilter / kube-proxy<br/>Service rules"]
+        service_rules -->|"DNAT selects backend"| backend["Nginx backend pod"]
+        bridge_hook -->|"No: expected bridge netfilter path may be absent<br/>(topology and dataplane dependent)"| service_path["Service-path failure candidate"]
+
+        destination -->|"Direct Pod IP"| pod_route["CNI bridge / pod route<br/>(bypasses Service DNAT)"]
+        pod_route --> veth_tcp["Virtual Ethernet TCP path<br/>checksum-offload behavior to verify"]
+        veth_tcp --> backend
+
+        backend --> reply["Backend response"]
+        reply --> conntrack["Conntrack / reverse Service NAT"]
+        conntrack --> client
+
+        ping["ICMP ping may still work"] -. "Observed in this experiment;<br/>not proof TCP is healthy" .-> pod_route
+        txoff["Test recorded: ethtool -K eth0 tx off"] -. "TCP direct-pod curl then worked<br/>in this experiment" .-> veth_tcp
+    end
+
+    subgraph RUN["Experiment sequence and observed recovery"]
+        backup["Before risky changes:<br/>take and verify etcd snapshot"]
+        setzero["Set bridge-nf-call-iptables=0"]
+        unload["Unload br_netfilter"]
+        test["Test ClusterIP and direct Pod IP;<br/>compare TCP with ICMP"]
+        directhang["Observed: direct same-node TCP curl hangs;<br/>ping succeeds"]
+        restore_module["Re-enable / reload br_netfilter"]
+        coredns["Observed: CoreDNS readiness fails"]
+        replace_dns["Replace CoreDNS pods;<br/>test DNS again"]
+        cni_check["Observed: direct CoreDNS Pod IP also times out;<br/>investigate CNI/routing state"]
+        recover["Recovery reported:<br/>restore node networking / restart CNI as needed;<br/>reboot was the final fallback"]
+
+        backup --> setzero --> unload --> test
+        test --> directhang
+        directhang --> restore_module --> coredns --> replace_dns --> cni_check --> recover
+    end
+
+    unload -. "changes kernel bridge processing" .-> bridge_hook
+    directhang -. "motivated checksum-offload test" .-> txoff
+    coredns -. "conntrack state mismatch was suspected;<br/>verify before concluding" .-> conntrack
+    cni_check -. "indicates failure beyond Service DNS alone" .-> pod_route
+
+    classDef config fill:#eaf2ff,stroke:#356ac3,stroke-width:2px
+    classDef observation fill:#fff4db,stroke:#b7791f,stroke-width:2px
+    classDef risk fill:#fff0f0,stroke:#c43c3c,stroke-width:2px
+    classDef normal fill:#eaf7ea,stroke:#388e3c,stroke-width:2px
+    class backup,setzero,unload,restore_module config
+    class directhang,coredns,cni_check observation
+    class service_path,recover risk
+    class client,veth,bridge,destination,bridge_hook,service_rules,pod_route,veth_tcp,backend,reply,conntrack,txoff,ping normal
+```
+
+---
+
 ## Phase 1: The Setup and The Break
 My goal was to understand why Kubernetes requires `br_netfilter`. I learned that the Linux kernel normally isolates **Layer 2 (bridging/MACs)** from **Layer 3 (routing/iptables)**. Because `kube-proxy` relies on L3 `iptables` for Service NAT, local Pod-to-Pod traffic via a Service IP bypasses these rules unless `br_netfilter` forces the L2 bridge to hand packets up to L3.
 
